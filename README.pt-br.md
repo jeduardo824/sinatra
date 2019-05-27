@@ -33,10 +33,14 @@ Em seguida execute:
 ruby minha_app.rb
 ```
 
-Acesse: [http://localhost:4567](http://localhost:4567)
+Acesse em: [http://localhost:4567](http://localhost:4567)
 
-É recomendado também executar `gem install thin`. Caso esta gem esteja disponível, o
-Sinatra irá utilizá-la.
+Códigos alterados só terão efeito após você reiniciar o servidor.  
+Por favor, reinicie o servidor após qualquer mudança ou use 
+[sinatra/reloader](http://www.sinatrarb.com/contrib/reloader).
+
+É recomendado também executar `gem install thin`. Caso esta gem esteja 
+disponível, o Sinatra irá utilizá-la.
 
 ## Conteúdo
 
@@ -44,7 +48,7 @@ Sinatra irá utilizá-la.
     * [Conteúdo](#conteúdo)
     * [Rotas](#rotas)
     * [Condições](#condições)
-    * [Retorno de valores](#retorno-de-valores)
+    * [Valores Retornados](#valores-retornados)
     * [Validadores de rota personalizados](#validadores-de-rota-personalizados)
     * [Arquivos estáticos](#arquivos-estáticos)
     * [Views / Templates](#views--templates)
@@ -82,18 +86,50 @@ Sinatra irá utilizá-la.
     * [Filtros](#filtros)
     * [Helpers](#helpers)
         * [Utilizando Sessões](#utilizando-sessões)
+          * [Segurança Secreta da Sessão](#segurança-secreta-da-sessão)  
+          * [Configuração da Sessão](#configuração-da-sessão)  
+          * [Escolhande Seu Próprio Middleware de Sessão](#escolhendo-middleware-de-sessão)
         * [Halting](#halting)
         * [Passing](#passing)
         * [Desencadeando Outra Rota](#desencadeando-outra-rota)
+        * [Definindo Corpo, Código de Status e Cabeçalhos]
+        (#definindo-corpo-codigo-de-status-cabeçalhos)
+        * [Respostas de Streaming](#respostas-de-streaming)
+        * [Logando](#logando)
+        * [Tipos Mime](#tipos-mime)
+        * [Gerando URLS](#gerando-urls)
+        * [Redirecionamento do Navegador](#redirecionamento-do-navagador)
+        * [Controle de Cache](#controle-de-cache)
+        * [Enviando Arquivos](#enviando-arquivos)
+        * [Acessando o Objeto de Requisição](#acessando-o-objeto-de-requisição)
+        * [Anexos](#anexos)
+        * [Trabalhando com Data e Hora](#trabalhando-com-data-e-hora)
+        * [Procurando Arquivos de Modelo](#procurando-arquivos-de-modelo)
     * [Configuração](#configuração)
+        * [Configurando proteção a ataques](#configurando-proteção-a-ataques)
+        * [Configurações Disponíveis](#configurações-disponíveis)  
+    * [Ambientes](#ambientes)
     * [Tratamento de Erros](#tratamento-de-erros)
+        * [Não Encontrado](#não-encontrado)
         * [Erro](#erro)
-    * [Mime Types](#mime-types)
     * [Rack Middleware](#rack-middleware)
     * [Testando](#testando)
-    * [Sinatra::Base - Middleware, Bibliotecas e aplicativos modulares](#sinatrabase---middleware-bibliotecas-e-aplicativos-modulares)
+    * [Sinatra::Base - Middleware, Bibliotecas e aplicativos modulares](#sinatrabase---middleware-bibliotecas-e-aplicativos-modulares)  
+        * [Modular vs. Estilo Clássico](#modular-vs-estilo-clássico)
+        * [Servindo uma Aplicação Modular](#servindo-uma-aplicação-modular)
+        * [Usando uma Aplicação de Estilo Clássico com um config.ru](#usando-uma-aplicação-de-estilo-clássico-com-um-configru)
+        * [Quando usar um config.ru?](#quando-usar-um-configru)
+        * [Usando Sinatra como Middleware](#usando-sinatra-como-middleware)
+        * [Criação de Aplicações Dinâmicas](#criação-de-aplicações-dinamicas)  
+    * [Escopos e Ligação](#escopos-e-ligação)
+        * [Escopo de Aplicação/Classe](#escopo-de-aplicação-classe)
+        * [Escopo de Instância/Requisição](#escopo-de-instância-requisição)
+        * [Escopo de Delegação](#escopo-de-delegação)
     * [Linha de comando](#linha-de-comando)
-        * [Multi-threading](#multi-threading)
+        * [Multi-threading](#multi-threading)  
+    * [Requerimentos](#requerimentos)
+    * [The Bleeding Edge](#the-bleeding-edge)
+        * [Com Bundler](#com-bundler)
     * [A última versão](#a-última-versão)
     * [Mais](#mais)
 
@@ -124,12 +160,28 @@ delete '/' do
 end
 
 options '/' do
-  .. estabelecendo alguma coisa ..pe
+  .. estabelecendo alguma coisa ..
+end
+
+link '/' do
+  .. associando alguma coisa ..
+end
+
+unlink '/' do
+  .. separando alguma coisa ..
 end
 ```
 
 As rotas são interpretadas na ordem em que são definidas. A primeira
 rota encontrada responde a requisição.
+
+Rotas com barras à direita são diferentes das que não contém as barras:
+
+```ruby
+get '/foo' do
+  # Não é o mesmo que "GET /foo/"
+end
+```
 
 Padrões de rota podem conter parâmetros nomeados, acessíveis por meio do
 hash `params`:
@@ -214,8 +266,19 @@ end
 ```
 
 A propósito, a menos que você desative a proteção contra ataques (veja
-abaixo), o caminho solicitado pode ser alterado antes de concluir a
-comparação com as suas rotas.
+[abaixo](#configurando-proteção-a-ataques)), o caminho solicitado pode ser 
+alterado antes de concluir a comparação com as suas rotas.
+
+Você pode customizar as opções usadas do [Mustermann](https://github.com/sinatra/mustermann#readme) para uma rota passando `:mustermann_opts` num hash:
+
+```ruby
+get '\A/posts\z', :musterman_opts => { :type => regexp, :check_anchors => false } do
+  # corresponde a /posts exatamente, com ancoragem explícita
+  "Se você combinar um padrão ancorado bata palmas!"
+end
+```
+
+Parece com uma [condição](#condições) mas não é! Essas opções serão misturadas no hash global `:mustermann_opts` descrito [abaixo](#configurações-disponíveis)
 
 ## Condições
 
@@ -316,8 +379,7 @@ end
 get('/') { Stream.new }
 ```
 
-Você também pode usar o método auxiliar `stream` (descrito abaixo) para
-incorporar a lógica de streaming na rota.
+Você também pode usar o método auxiliar `stream` ([descrito abaixo](#respostas-de-streaming)) para reduzir códigos boilerplate e para incorporar a lógica de streaming na rota.
 
 ## Validadores de Rota Personalizados
 
@@ -380,6 +442,8 @@ set :public_folder, File.dirname(__FILE__) + '/estatico'
 Note que o nome do diretório público não é incluido na URL. Um arquivo
 `./public/css/style.css` é disponibilizado como
 `http://exemplo.com/css/style.css`.
+
+Use a configuração `:static_cache_control` (veja [abaixo](#controle-de-cache)) para adicionar a informação `Cache-Control` no cabeçalho.
 
 ## Views / Templates
 
@@ -511,7 +575,13 @@ get '/' do
 end
 ```
 
-Renderiza um template string.
+Renderiza um template string. Você pode opcionalmente especificar `path` e `:line` para um backtrace mais claro se existir um caminho do sistema de arquivos ou linha associada com aquela string.
+
+```ruby
+get '/' do
+  haml '%div.title Olá Mundo', :path => 'exemplos/arquivo.haml', :line => 3
+end
+```
 
 ### Linguagens de template disponíveis
 
@@ -896,7 +966,7 @@ Não é possível chamar métodos por este template, nem passar *locals* para o 
 erb :overview, :locals => { :text => creole(:introduction) }
 ```
 
-Note que vcoê também pode chamar o método `creole` dentro de outros templates:
+Note que você também pode chamar o método `creole` dentro de outros templates:
 
 ```ruby
 %h1 Olá do Haml!
@@ -1169,7 +1239,7 @@ end
 
 Se existir um template com nome “layout”, ele será utilizado toda vez
 que um template for renderizado. Você pode desabilitar layouts passando
-`:layout => false`.
+`:layout => false` ou desabilita-los por padrão via `set :haml, :layout => false`
 
 ```ruby
 get '/' do
@@ -1250,6 +1320,8 @@ after do
 end
 ```
 
+Nota: A não ser que você use o metódo `body` ao invés de apenas retornar uma String das rotas, o corpo ainda não estará disponível no filtro after, uma vez que é gerado tardiamente.
+
 Filtros opcionalmente têm um padrão, fazendo com que sejam avaliados
 somente se o caminho do pedido coincidir com esse padrão:
 
@@ -1260,6 +1332,18 @@ end
 
 after '/create/:slug' do |slug|
   session[:last_slug] = slug
+end
+```
+
+Como rotas, filtros também aceitam condições:
+
+```ruby
+before :agent => /Songbird/ do
+  #...
+end
+
+after '/blog/*', :host_name => 'exemplo.com' do
+  #...
 end
 ```
 
@@ -1280,6 +1364,22 @@ get '/:nome' do
 end
 ```
 
+Alternativamente, métodos Helper podem ser definidos separadamente em módulos:
+
+```ruby
+module FooUtils
+  def foo(nome) "#{nome}foo" end
+end
+
+module BarUtils
+  def bar(nome) "#{nome}bar" end
+end
+
+helpers FooUtils, BarUtils
+```
+
+O efeito é o mesmo que incluir os módulos na classe da aplicação.
+
 ### Utilizando Sessões
 
 Sessões são usadas para manter um estado durante uma requisição. Se ativa, você terá disponível um hash de sessão para cada sessão de usuário:
@@ -1295,38 +1395,97 @@ get '/:value' do
   session['value'] = params['value']
 end
 ```
+#### Segredo Seguro da Sessão
 
-Note que `enable :sessions` utilizará um cookie para guardar todos os dados da sessão. Isso nem sempre pode ser o que você quer (guardar muitos dados irá aumentar o seu tráfego, por exemplo). Você pode utilizar qualquer Rack middleware de sessão: para fazer isso **não** utilize o método `enable :sessions`, ao invés disso utilize seu middleware de sessão como utilizaria qualquer outro:
+Para melhorar a segurança, os dados da sessão no cookie são assinado com uma segredo de sessão usando `HMAC-SHA1`. Esse segredo de sessão deve ser, de preferência, um valor criptograficamente randômico, seguro, de um comprimento apropriado no qual `HMAC-SHA1` é maior ou igual a 64 bytes (512 bits, 128 carecteres hexadecimais). Você será avisado para não usar uma chave secreta menor que 32 bytes de randomicidade (256 bits, 64 caracteres hexadecimais). Portanto, é **muito importante** que você não invente o segredo, mas use um gerador de números aleatórios seguro para cria-lo. Humanos são extremamente ruins em gerar números aleatórios.
 
-```ruby
-use Rack::Session::Pool, :expire_after => 2592000
+Por padrão, um segredo de sessão randômico seguro de 32 bytes é gerada para você pelo Sinatra, mas ele mudará toda vez que você reiniciar sua aplicação. Se você tiver múltiplas instâncias da sua aplicação e você deixar que o Sinatra gere a chave, cada instância teria uma chave de sessão diferente, o que certamente não é o que você quer.
 
-get '/' do
-  "value = " << session[:value].inspect
-end
+Para melhor segurança e usabilidade é [recomendado](https://12factor.net/config) que você gere um segredo randômico secreto e salve-o em uma variável de ambiente em cada host rodando sua aplicação, assim todas as instâncias da sua aplicação irão compartilhar o mesmo segredo. Você deve, periodicamente, mudar esse segredo de sessão para um novo valor. Abaixo, são mostrados alguns exemplos de como você pode criar um segredo de 64 bytes e usa-lo:
 
-get '/:value' do
-  session['value'] = params['value']
-end
+**Gerando Segredo de Sessão**
+
+```text
+$ ruby -e "require 'securerandom'; puts SecureRandom.hex(64)"
+99ae8af...snip...ec0f262ac
 ```
 
-Para melhorar a segurança, os dados da sessão guardados no cookie é assinado com uma chave secreta da sessão. Uma chave aleatória é gerada para você pelo Sinatra. Contudo, já que a chave mudará cada vez que você inicia sua aplicação, você talvez queira defini-la você mesmo para que todas as instâncias da aplicação compartilhe-a:
+**Gerando Segredo de Sessão (Pontos adicionais)**
 
-```ruby
-set :session_secret, 'super secret'
+Use preferencialmente a [gem sysrandom](https://github.com/cryptosphere/sysrandom#readme) para utilizar as facilidades do sistema RNG para gerar valores aleatórios ao invés do `OpenSSL` no qual o MRI Ruby padroniza para:
+
+```text
+$ gem install sysrandom
+Building native extensions. This could take a while...
+Sucessfully installed sysrandom-1.x
+1 gem installed
+
+$ ruby -r "require 'sysrandom/securerandom'; puts SecureRandom.hex(64)"
+99ae8af...snip...ec0f262ac
 ```
 
-Se você quiser fazer outras configurações, você também pode guardar um hash com as opções nas configurações da `session`:
+**Segredo de Sessão numa Variável de Ambiente**
+
+Defina uma variável de ambiente `SESSION_SECRET` para o Sinatra com o valor que você gerou. Salve esse valor entre as reinicializações do seu host. Já que a forma de fazer isso irá variar entre os sistemas operacionais, o exemplo abaixo serve apenas para fins ilustrativos:
+
+```bash
+# echo "export SESSION_SECRET = 99ae8af...snip...ec0f262ac" >> ~/.bashrc
+```
+
+**Configurando o Segredo de Sessão na Aplicação**
+
+Configure sua aplicação para uma falha de segredo seguro aleatório se a variável de ambiente `SESSION_SECRET` não estiver disponível.
+
+Como ponto adicional use a [gem sysrandom](https://github.com/cryptosphere/sysrandom#readme) da seguinte forma:
+
+```ruby
+require 'securerandom'
+# -or- require 'sysrandom/securearandom'
+set :session_secret, ENV.fecth(`SESSION_SECRET`) { SecureRandom.hex(64) }
+```
+
+#### Configuração de Sessão
+
+Se você deseja configurar isso adicionalmente, você pode salvar um hash com opções na definição de `sessions`:
 
 ```ruby
 set :sessions, :domain => 'foo.com'
 ```
 
-Para compartilhar sua sessão entre outros aplicativos em um subdomínio de foo.com, utilize o prefixo *.*:
+Para compartilhar sua sessão com outras aplicações no subdomínio de foo.com, adicione um *.* antes do domínio como no exemplo abaixo:
 
 ```ruby
 set :sessions, :domain => '.foo.com'
 ```
+
+#### Escolhendo Seu Próprio Middleware de Sessão
+
+Perceba que `enable :sessions` na verdade guarda todos seus dados num cookie. Isto pode não ser o que você deseja sempre (armazenar muitos dados irá aumentar seu tráfego, por exemplo). Você pode usar qualquer middleware de sessão Rack para fazer isso, um dos seguintes métodos pode ser usado:
+
+```ruby
+enable :sessions
+set :session_store, Rack::Session::Pool
+```
+
+Ou definir as sessões com um hash de opções:
+
+```ruby
+set :sessions, :expire_after => 2592000
+set :session_store, Rack::Session::Pool
+```
+
+Outra opção é **não** usar `enable :sessions`, mas ao invés disso trazer seu middleware escolhido como você faria com qualquer outro middleware.
+
+É importante lembrar que usando esse método, a proteção baseada na sessão **não estará habilitada por padrão**.
+
+O middleware Rack, para fazer isso, precisará que isso também seja adicionado:
+
+```ruby
+use Rack::Session::Pool, :expire_after => 2592000
+use Rack::Protection::RemoteToken
+use Rack::Protection::SessionHijacking
+```
+Veja '[Configurando proteção a ataques](#configurando-proteção-a-ataques)' para mais informações.
 
 ### Halting
 
@@ -1336,31 +1495,31 @@ Para parar imediatamente uma requisição com um filtro ou rota utilize:
 halt
 ```
 
-Você também pode especificar o status quando parar…
+Você também pode especificar o status quando parar:
 
 ```ruby
 halt 410
 ```
 
-Ou com corpo de texto…
+Ou com corpo de texto:
 
 ```ruby
 halt 'isso será o corpo do texto'
 ```
 
-Ou também…
+Ou com ambos:
 
 ```ruby
-halt 401, 'vamos embora!'
+halt 401, 'vá embora!'
 ```
 
-Com cabeçalhos…
+Com cabeçalhos:
 
 ```ruby
 halt 402, {'Content-Type' => 'text/plain'}, 'revanche'
 ```
 
-É obviamente possivel combinar um template com o `halt`:
+Também é obviamente possível combinar um template com o `halt`:
 
 ```ruby
 halt erb(:error)
@@ -1406,6 +1565,325 @@ Note que no exemplo acima você ganharia performance ao simplemente mover o `"ba
 Se você quer que a requisição seja enviada para a mesma instancia da aplicação ao invês de uma duplicada, use `call!` no lugar de `call`.
 
 Veja a especificação do Rack se você quer aprender mais sobre o `call`.
+
+### Definindo Corpo, Código de Status e Cabeçalhos
+
+É possível e recomendado definir o código de status e o corpo da resposta com o valor retornado do bloco da rota. Entretanto, em alguns cenário você pode querer definir o corpo em um ponto arbitrário do fluxo de execução. Você pode fazer isso com o metódo helper `body`. Se você fizer isso, poderá usar esse metódo de agora em diante para acessar o body:
+
+```ruby
+get '/foo' do
+  body "bar"
+end
+
+after do
+  puts body
+end
+```
+
+Também é possivel passar um bloco para `body`, que será executado pelo manipulador Rack (isso pode ser usado para implementar streaming, [veja "Retorno de Valores"](#retorno-de-valores)).
+
+Similar ao corpo, você pode também definir o código de status e cabeçalhos:
+
+```ruby
+get '/foo' do
+  status 418
+  headers \
+    "Permite" => "BREW, POST, GET, PROPFIND, WHEN"
+    "Atualiza" => "Refresh: 20; https://ietf.org/rfc/rfc2324.txt"
+  body "Eu sou um bule de chá!"
+end
+```
+
+Assim como `body`, `headers` e `status` sem argumentos podem ser usados para acessar seus valores atuais.
+
+### Transmitindo Respostas
+
+As vezes você quer começar a mandar dados enquanto está gerando partes do corpo da resposta. Em exemplos extremos, você quer continuar enviando dados até o cliente encerrar a conexão. Você pode usar o helper `stream` para evitar criar seu próprio empacotador:
+
+```ruby
+get '/' do
+  stream do |out|
+    out << "Isso será len -\n"
+    sleep 0.5
+    out << " Aguarde \n"
+    sleep 1
+    out << " dário!\n"
+  end
+end
+```
+
+Isso permite você implementar APIs de Transmissão, [Eventos Enviados pelo Servidor](https://w3c.github.io/eventsource/), e pode ser usado como a base para [WebSockets](https://en.wikipedia.org/wiki/WebSocket). Pode ser usado também para aumentar a taxa de transferência se algum, mas não todo, conteúdo depender de um recurso lento.
+
+Perceba que o comportamento da transmissão, especialmente o número de requisições concorrentes, depende altamente do servidor web usado para servir a aplicação. Alguns servidores podem até mesmo não suportar transmissão de maneira alguma. Se o servidor não suportar transmissão, o corpo será enviado completamente após que o bloco passado para `stream` terminar de executar. Transmissão não funciona de nenhuma maneira com Shotun.
+
+Se o parâmetro opcional é definido como `keep_open`, ele não chamará `close` no objeto transmitido, permitindo você a fecha-lo em algum outro ponto futuro no fluxo de execução. Isso funciona apenas em servidores orientados a eventos, como Thin e Rainbows. Outros servidores irão continuar fechando a transmissão:
+
+```ruby
+# long polling
+
+set :server, :thin
+conexoes = []
+
+get '/assinar' do
+  # registra o interesse de um cliente em servidores de eventos
+  stream(:keep_open) do |saida|
+    conexoes << saida
+    # retire conexões mortas
+    conexoes.reject!(&:closed?)
+  end
+end
+
+post '/:messagem' do
+  conexoes.each do |saida|
+    # notifica o cliente que uma nova mensagem chegou
+    saida << params['messagem'] << "\n"
+
+    # indica ao cliente para se conectar novamente
+    saida.close
+  end
+
+  # confirma
+  "messagem recebida"
+end
+```
+
+Também é possivel para o cliente fechar a conexão quando está tentando escrever para o socket. Devido a isso, é recomendado checar `out.closed?` antes de tentar escrever.
+
+### Logando
+
+No escopo da requisição, o helper `logger` expõe uma instância `Logger`:
+
+```ruby
+get '/' do
+  logger.info "loading data"
+  # ...
+end
+```
+
+Esse logger irá por automaticamente as configurações de logging do handler do Rack na conta. Se o logging estiver desabilitado, esse método recuperará um objeto dummy, então você não terá que se preocupar com suas rotas e filtros.
+
+Perceba que logging está habilitao apenas para `Sinatra::Application` por padrão, então se você herdar de `Sinatra::Base`, você provavelmente irá querer habilitar:
+
+```ruby
+  class MyApp < Sinatra::Base
+    configure :production, :development do
+      enable :logging
+    end
+  end
+```
+
+Para eviar que qualquer middleware de logging seja configurado, defina a configuração `logging` como `nil`. Entretanto, tenha em mente que `logger` retornará, nesse caso, `nil`. Um caso de uso comum é quanto você quer definir seu próprio logger. Sinatra irá usar qualquer um que ele achar em `env['rack.logger']`
+
+### Tipos Mime
+
+Quando se está usando `send_file` ou arquivos estáticos, você pode ter tipos mime que o Sinatra não entende. Use `mime_type` para registrá-los pela extensão do arquivo:
+
+```ruby
+configure do
+  mime_type :foo, 'text/foo'
+end
+```
+
+Você pode utilizar também com o helper `content_type`:
+
+```ruby
+get '/' do
+  content-type :foo
+  "foo foo foo"
+end
+```
+
+### Gerando URLs
+
+Para gerar URLs você deve usar o metódo helper `url` no Haml:
+
+```ruby
+%a{:href => url('/foo')} foo
+```
+
+Isso inclui proxies reversos e rotas Rack, se presentes.
+
+Esse método é também apelidado para `to` (veja [abaixo](#redirecionamento-do-browser) para um exemplo).
+
+### Redirecionamento do Browser
+
+Você pode lançar um redirecionamento no browser com o metódo helper `redirect`:
+
+```ruby
+get '/foo' do
+  redirect to('/bar')
+end
+```
+
+Quaisquer paramêtros adicional são interpretados como argumentos passados ao `halt`:
+
+```ruby
+redirect to('/bar'), 303
+redirect 'http://www.google.com/', 'lugar errado, amigo'
+```
+
+Você pode também facilmente redirecionar para a página da qual o usuário veio com `redirect back`:
+
+```ruby
+get '/foo' do
+  "<a href='/bar'>do something</a>"
+end
+
+get '/bar' do
+  do_something
+  redirect back
+end
+```
+
+Para passar argumentos com um redirecionamento, adicione-os a query:
+
+```ruby
+redirect to('/bar?sum=42')
+```
+
+Ou use uma sessão:
+
+```ruby
+enable :sessions
+
+get '/foo' do
+  session[:secret] = 'foo'
+  redirect to('/bar')
+end
+
+get '/bar' do
+  session[:secret]
+end
+```
+
+### Controle de Cache
+
+Definir sues cabeçalhos corretamente é o principal passo para uma correta cache HTTP.
+
+Você pode facilmente definir o cabeçalho de Cache-Control como:
+
+```ruby
+get '/' do
+  cache_control :public
+  "guarde isso!"
+end
+```
+
+Dica profissional: Configure a cache em um filtro anterior:
+
+```ruby
+before do
+  cache_control :public, :must_revalidate, :max_age => 60
+end
+```
+
+Se você está usando o helper `expires` para definir seu cabeçalho correspondente, `Cache-Control` irá ser definida automaticamente para você:
+
+```ruby
+before do
+  expires 500, :public, :must_revalidate
+end
+```
+
+Para usar propriciamente caches, você deve considerar usar `etag` ou `last_modified`. É recomendado chamar esses helpers *antes* de fazer qualquer tipo de processamento pesado, já que eles irão imediatamente retorna uma resposta se o cliente já possui a versão atual na sua cache:
+
+```ruby
+get "/artigo/:id" do
+  @artigo = Artigo.find params['id']
+  last_modified @artigo.updated_at
+  etag @artigo.sha1
+  erb :artigo
+end
+```
+
+Também é possível usar uma [ETag fraca](https://en.wikipedia.org/wiki/HTTP_ETag#Strong_and_weak_validation):
+
+```ruby
+etag @article.sha1, :weak
+```
+Esses helpers não irão fazer nenhum processo de cache para você, mas irão alimentar as informações necessárias para sua cache. Se você está pesquisando por uma solução rápida de proxy-reverso, tente [rack-cache](https://github.com/rtomayko/rack-cache#readme):
+
+```ruby
+require "rack/cache"
+require "sinatra"
+
+use Rack::Cache
+
+get '/' do
+  cache_control :public, :max_age => 36000
+  sleep 5
+  "olá"
+end
+```
+
+Use a configuração `:static_cache_control` (veja [acima]#(controle-de-cache)) para adicionar o cabeçalho de informação `Cache-Control` para arquivos estáticos.
+
+De acordo com a RFC 2616, sua aplicação deve se comportar diferentemente se o cabeçalho If-Match ou If-None-Match é definido para `*`, dependendo se o recurso requisitado já existe. Sinatra assume que recursos para requisições seguras (como get) e idempotentes (como put) já existem, enquanto que para outros recursos (por exemplo requisições post) são tratados como novos recursos. Você pode mudar esse comportamento passando em uma opção `:new_resource`:
+
+```ruby
+get '/create' do
+  etag '', :new_resource => true
+  Artigo.create
+  erb :novo_artigo
+end
+```
+
+Se você quer continuar usando um ETag fraco, passe em uma opção `:kind`:
+
+```ruby
+etag '', :new_resource => true, :kind => :weak
+```
+
+### Enviando Arquivos
+
+Para retornar os conteúdos de um arquivo como as resposta, você pode usar o metódo helper `send_file`:
+
+```ruby
+get '/' do
+  send_file 'foo.png'
+end
+```
+
+Também aceita opções:
+
+```ruby
+send_file 'foo.png', :type => :jpg
+```
+
+As opções são:
+
+<dl>
+  <dt>filename</dt>
+    <dd>Nome do arquivo a ser usado na respota,
+    o padrão é o nome do arquivo reak</dd>
+  <dt>last_modified</dt>
+    <dd>Valor do cabeçalho Last-Modified, o padrão corresponde ao mtime do arquivo.</dd>
+
+  <dt>type</dt>
+    <dd>Valor do cabeçalho Content-Type, extraído da extensão do arquivo se
+    inexistente.</dd>
+
+  <dt>disposition</dt>
+    <dd>
+      Valor do cabeçalho Content-Disposition, valores possíveis: <tt>nil</tt>
+      (default), <tt>:attachment</tt> and <tt>:inline</tt>
+    </dd>
+
+  <dt>length</dt>
+    <dd>Valor do cabeçalho Content-Length, o padrão corresponde ao tamanho do arquivo.</dd>
+
+  <dt>status</dt>
+    <dd>
+      Status code to be sent. Useful when sending a static file as an error
+      page. If supported by the Rack handler, other means than streaming
+      from the Ruby process will be used. If you use this helper method,
+      Sinatra will automatically handle range requests.
+      Código de status a ser enviado. Útil quando está se enviando um arquivo estático
+      como uma página de erro. Se suportado pelo handler do Rack, outros meios além de
+      transmissão do processo do Ruby serão usados. So você usar esse metódo helper,
+      o Sinatra irá automaticamente lidar com requisições de alcance.
+    </dd>
+</dl>
 
 ## Configuração
 
@@ -1506,22 +1984,6 @@ end
 
 O Sinatra instala os manipuladores especiais `not_found` e `error`
 quando roda sobre o ambiente de desenvolvimento.
-
-## Mime Types
-
-Quando utilizamos `send_file` ou arquivos estáticos você pode ter mime
-types Sinatra não entendidos. Use `mime_type` para registrar eles por
-extensão de arquivos:
-
-```ruby
-mime_type :foo, 'text/foo'
-```
-
-Você também pode utilizar isto com o helper `content_type`:
-
-```ruby
-content_type :foo
-```
 
 ## Rack Middleware
 
